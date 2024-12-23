@@ -207,7 +207,7 @@ def run(
                 pred = model(im, augment=augment, visualize=visualize)
         # NMS
         with dt[2]:
-            print(f"Predictions before suppresion {pred}")
+            LOGGER.info(f"Predictions before suppresion {pred}")
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
         # Second-stage classifier (optional)
