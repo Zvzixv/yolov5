@@ -207,8 +207,24 @@ def run(
                 pred = model(im, augment=augment, visualize=visualize)
         # NMS
         with dt[2]:
-            LOGGER.info(f"Predictions before suppresion {pred}")
-            pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            def add_raw_confidences(pred, pred_before_nms):
+                import tqdm
+                augmented_predictions = []
+                for processed_prediction in tqdm.tqdm(pred[0]):
+                    found = False
+                    for raw_prediction in pred_before_nms:
+                        if processed_prediction[:4] == raw_prediction[:4]:
+                            augmented_predictions.append(torch.unsqueeze(raw_prediction, 0))
+                            found = True
+                            break
+                    if not found:
+                        LOGGER.info("Prediction not found")
+                return [torch.cat(augmented_predictions)]
+
+            pred_before_nms = pred[0]
+            pred = non_max_suppression(pred, conf_thres, iou_thres, classes,
+                                       agnostic_nms, max_det=max_det)
+            pred = add_raw_confidences(pred, pred_before_nms)
 
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
