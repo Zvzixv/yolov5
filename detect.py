@@ -207,8 +207,28 @@ def run(
                 pred = model(im, augment=augment, visualize=visualize)
         # NMS
         with dt[2]:
-            LOGGER.info(f"Predictions before suppresion {pred}")
+            def add_raw_confidences(pred, pred_before_nms):
+                import tqdm
+                augmented_predictions = []
+                unseen_items = list(range(len(pred_before_nms)))
+                for processed_prediction in tqdm.tqdm(pred[0]):
+                    found = False
+                    xywh_processed_prediction = xyxy2xywh(processed_prediction[:4])
+                    for i in unseen_items:
+                        raw_prediction = pred_before_nms[i]
+                        if torch.isclose(xywh_processed_prediction, raw_prediction[:4]).all():
+                            augmented_predictions.append(torch.unsqueeze(raw_prediction, 0))
+                            found = True
+                            unseen_items.remove(i)
+                            break
+                    if not found:
+                        LOGGER.info("No prediction found")
+                return [torch.cat(augmented_predictions)]
+
+            pred_before_nms = pred[0][0]
+            pred_before_nms = pred_before_nms[pred_before_nms[:, 4].argsort(descending=True)]
             pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            pred = add_raw_confidences(pred, pred_before_nms)
 
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
@@ -217,9 +237,9 @@ def run(
         csv_path = save_dir / "predictions.csv"
 
         # Create or append to the CSV file
-        def write_to_csv(image_name, prediction, confidence):
+        def write_to_csv(image_name, prediction, confidence, probabilities):
             """Writes prediction data for an image to a CSV file, appending if the file exists."""
-            data = {"Image Name": image_name, "Prediction": prediction, "Confidence": confidence}
+            data = {"Image Name": image_name, "Prediction": prediction, "Confidence": confidence, "Probabilities": [number.item() for number in probabilities]}
             with open(csv_path, mode="a", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=data.keys())
                 if not csv_path.is_file():
@@ -253,13 +273,18 @@ def run(
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
+                    #kod prywatny:
+                    all_confidences = xyxy[4:]
+                    xyxy=xyxy[:4]
+                    #assert (len(all_confidences) == 85), len(all_confidences)
+
                     c = int(cls)  # integer class
                     label = names[c] if hide_conf else f"{names[c]}"
                     confidence = float(conf)
                     confidence_str = f"{confidence:.2f}"
 
                     if save_csv:
-                        write_to_csv(p.name, label, confidence_str)
+                        write_to_csv(p.name, label, confidence_str, all_confidences)
 
                     if save_txt:  # Write to file
                         if save_format == 0:
