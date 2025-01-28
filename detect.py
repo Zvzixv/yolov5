@@ -217,7 +217,8 @@ def run(
                     for i in unseen_items:
                         raw_prediction = pred_before_nms[i]
                         if torch.isclose(xywh_processed_prediction, raw_prediction[:4]).all():
-                            augmented_predictions.append(torch.unsqueeze(raw_prediction, 0))
+                            c = torch.argmax(raw_prediction[4:])
+                            augmented_predictions.append(torch.unsqueeze(torch.cat((raw_prediction, torch.tensor([c])),0),dim=0))
                             found = True
                             unseen_items.remove(i)
                             break
@@ -267,8 +268,8 @@ def run(
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
                 # Print results
-                for c in det[:, 5].unique():
-                    n = (det[:, 5] == c).sum()  # detections per class
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()  # detections per class
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
