@@ -217,7 +217,7 @@ def run(
                     for i in unseen_items:
                         raw_prediction = pred_before_nms[i]
                         if torch.isclose(xywh_processed_prediction, raw_prediction[:4]).all():
-                            c = torch.argmax(raw_prediction[4:])
+                            c = torch.argmax(raw_prediction[4:-1])
                             augmented_predictions.append(torch.unsqueeze(torch.cat((raw_prediction, torch.tensor([c])),0),dim=0))
                             found = True
                             unseen_items.remove(i)
